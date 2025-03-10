@@ -12,9 +12,14 @@ app = FastAPI()
 def root():
     return {"message": "FastAPI is running!"}
 
-# SudachiPy & spaCy モデルのロード
-sudachi_tokenizer = dictionary.Dictionary().create()
+import os
+
+# SudachiPy & spaCy モデルのロード（sudachidict_full を明示的に指定）
+dic_path = os.path.join(os.path.dirname(sudachipy.__file__), "resources", "sudachidict_full")
+sudachi_tokenizer = dictionary.Dictionary(dic_path).create()
+
 nlp = spacy.load("ja_core_news_md")
+
 
 # 駅・市町村・商業施設・商店街リスト（仮のデータ構造、実際のデータは別ファイルからロード）
 prefecture_stations = {
@@ -224,24 +229,38 @@ def get_random_location(prefecture, location_list):
     return ""
 
 def detect_entity(text):
-    tokens = sudachi_tokenizer.tokenize(text)
+    tokens = sudachi_tokenizer.tokenize(text, mode="C")  # "C" モードで長い単語を優先
     entities = [m.surface() for m in tokens if m.part_of_speech()[0] == "名詞"]
     return entities
+
+import re
 
 def convert_text(text, source_prefecture, target_prefecture):
     words = detect_entity(text)
     
     for word in words:
-        if word in prefecture_stations[source_prefecture]:
+        # 駅名変換
+        if any(re.search(re.escape(w), word) for w in prefecture_stations[source_prefecture]):
             text = text.replace(word, get_random_location(target_prefecture, prefecture_stations))
-        elif word in prefecture_cities[source_prefecture]:
+        
+        # 市町村変換
+        elif any(re.search(re.escape(w), word) for w in prefecture_cities[source_prefecture]):
             text = text.replace(word, get_random_location(target_prefecture, prefecture_cities))
-        elif word in prefecture_malls[source_prefecture]:
-            text = text.replace(word, get_random_location(target_prefecture, prefecture_malls))
-        elif word in prefecture_shotengai[source_prefecture]:
-            text = text.replace(word, get_random_location(target_prefecture, prefecture_shotengai))
+        
+        # 商業施設変換（部分一致で検索）
+        elif any(re.search(re.escape(w), text) for w in prefecture_malls[source_prefecture]):
+            match = next((w for w in prefecture_malls[source_prefecture] if re.search(re.escape(w), text)), None)
+            if match:
+                text = text.replace(match, get_random_location(target_prefecture, prefecture_malls))
+        
+        # 商店街変換（部分一致で検索）
+        elif any(re.search(re.escape(w), text) for w in prefecture_shotengai[source_prefecture]):
+            match = next((w for w in prefecture_shotengai[source_prefecture] if re.search(re.escape(w), text)), None)
+            if match:
+                text = text.replace(match, get_random_location(target_prefecture, prefecture_shotengai))
     
     return text
+
 
 @app.post("/convert_location")
 def convert_location(data: RequestData):
