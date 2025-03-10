@@ -6,3 +6,4 @@ spacy
 sudachipy
 sudachidict_core
 https://github.com/explosion/spacy-models/releases/download/ja_core_news_md-3.5.0/ja_core_news_md-3.5.0.tar.gz
+numpy==1.23.5
