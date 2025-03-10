@@ -8,6 +8,10 @@ from sudachipy import dictionary
 # FastAPI インスタンス
 app = FastAPI()
 
+@app.get("/")
+def root():
+    return {"message": "FastAPI is running!"}
+
 # SudachiPy & spaCy モデルのロード
 sudachi_tokenizer = dictionary.Dictionary().create()
 nlp = spacy.load("ja_core_news_md")
